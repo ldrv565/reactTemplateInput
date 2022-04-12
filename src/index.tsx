@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { TextfieldWithTags } from "./TextfieldWithTags";
-import { normalizeTreeWalker, initInputRows, initRow } from "./utils";
+import { normalizeTreeWalker, initRow } from "./utils";
 import { SPACE_CHAR } from "./constants";
 import { TagButton } from "./TagButton";
 
@@ -29,15 +29,15 @@ function App() {
     });
   }, []);
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.metaKey || e.ctrlKey) {
       if (e.key === "z") {
         e.preventDefault();
       }
     }
-  };
+  }, []);
 
-  const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  const onFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     initRow(e.target);
     setTimeout(() => {
       const selection = window.getSelection();
@@ -45,16 +45,16 @@ function App() {
         selection.setPosition(selection.focusNode, 0);
       }
     }, 0);
-  };
+  }, []);
 
-  const onInput = (e: React.ChangeEvent<HTMLDivElement>) => {
+  const onInput = useCallback((e: React.ChangeEvent<HTMLDivElement>) => {
     normalizeTreeWalker(
       e.target,
       TAGS.map((tag) => `{${tag}}`)
     );
 
     onChange(e.target.innerText);
-  };
+  }, []);
 
   return (
     <div>
