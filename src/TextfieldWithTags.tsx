@@ -40,6 +40,13 @@ export const TextfieldWithTags: React.FC<TextFieldProps> = (props) => {
   return (
     <TextFieldStyled
       {...props}
+      onKeyDown={(e) => {
+        if (e.metaKey || e.ctrlKey) {
+          if (e.key === "z") {
+            e.preventDefault();
+          }
+        }
+      }}
       multiline
       InputProps={{
         inputComponent: CustomInputComponent

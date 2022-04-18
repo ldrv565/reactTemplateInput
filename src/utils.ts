@@ -4,6 +4,13 @@ export const isText = (node?: Node) => node?.nodeName === "#text";
 export const isSpan = (node?: Node) => node?.nodeName === "SPAN";
 export const isDiv = (node?: Node) => node?.nodeName === "DIV";
 
+export const isEmptyNode = (node: Node) => {
+  if (node.firstChild && !node.firstChild?.textContent) {
+    node.removeChild(node.firstChild);
+  }
+  return !node.firstChild;
+};
+
 export const getClosestParentDiv = (node?: Node) => {
   let div = node;
   if (isText(div)) {
@@ -18,12 +25,51 @@ export const getClosestParentDiv = (node?: Node) => {
   return null;
 };
 
-const clearFromTagNames = (text: string, tagNames: string[]) => {
-  const regExp = new RegExp(tagNames.join("|"), "gi");
+export const getClosestChildText = (node?: Node) => {
+  let text = node;
+  if (isDiv(text)) {
+    text = text.firstChild;
+  }
+  if (isSpan(text)) {
+    text = text.firstChild;
+  }
+  if (isText(text)) {
+    return text;
+  }
+  return null;
+};
 
+export const clearFromTagNames = (text: string, tagNames: string[]) => {
+  const regExp = new RegExp(tagNames.join("|"), "gi");
   return text.replace(regExp, "");
 };
 
+// делим текст и тэг на отдельные узлы в начале и конце должны быть спаны и в них должен быть хотя бы пробел
+// иначе браузер начнет создавать деревья разной глубины и будет глючить курсор
+export const sliceText = (text: string, offset: number) => {
+  const start = document.createElement("span");
+  const startText = text.slice(0, offset) || SPACE_CHAR;
+  start.append(startText);
+
+  const end = document.createElement("span");
+  const endText = text.slice(offset) || SPACE_CHAR;
+  end.append(endText);
+
+  return { start, end };
+};
+
+export const replaceChildWith = (parent: Node, child: Node, nodes: Node[]) => {
+  let prevNode = child;
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const currentNode = nodes[i];
+    parent.insertBefore(currentNode, prevNode);
+    prevNode = currentNode;
+  }
+
+  parent.removeChild(child);
+};
+
+// удаляем тэги введеные руками, объединяем куски текста в единые спаны
 export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
   const selection = window.getSelection();
   const { focusNode, focusOffset } = selection;
@@ -93,21 +139,15 @@ export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
   }
 };
 
-export const isEmptyNode = (node: Node) => {
-  if (node.firstChild && !node.firstChild?.textContent) {
-    node.removeChild(node.firstChild);
-  }
-  return !node.firstChild;
-};
-
 export const initRow = (rowNode: Node, needFocus?: boolean) => {
   if (isEmptyNode(rowNode)) {
-    const selection = window.getSelection();
     const span = document.createElement("span");
     const spaceChar = document.createTextNode(SPACE_CHAR);
     span.appendChild(spaceChar);
+    console.log(rowNode);
     rowNode.appendChild(span);
     if (needFocus) {
+      const selection = window.getSelection();
       selection.setPosition(spaceChar, 0);
     }
   }
@@ -116,20 +156,18 @@ export const initRow = (rowNode: Node, needFocus?: boolean) => {
 export const initInputRows = (inputNode: Node) => {
   const selection = window.getSelection();
   const { focusNode } = selection;
-
   const focusDiv = getClosestParentDiv(focusNode);
-  initRow(focusDiv);
 
-  inputNode.childNodes.forEach((child) => {
-    let rowNode = getClosestParentDiv(child);
+  if (inputNode.childNodes.length) {
+    inputNode.childNodes.forEach((child) => {
+      let rowNode = getClosestParentDiv(child);
 
-    if (isDiv(rowNode)) {
-      if (!inputNode.isSameNode(rowNode) && rowNode.previousSibling) {
-        initRow(rowNode.previousSibling);
+      if (isDiv(rowNode)) {
+        const needFocus = focusDiv?.isSameNode(rowNode);
+        initRow(rowNode, needFocus);
       }
-
-      const needFocus = focusDiv?.isSameNode(rowNode);
-      initRow(rowNode, needFocus);
-    }
-  });
+    });
+  } else {
+    initRow(inputNode, true);
+  }
 };

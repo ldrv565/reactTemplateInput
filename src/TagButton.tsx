@@ -1,6 +1,12 @@
 import { Button } from "@material-ui/core";
 import { SPACE_CHAR } from "./constants";
-import { initRow, isDiv, isText } from "./utils";
+import {
+  getClosestChildText,
+  initRow,
+  isDiv,
+  replaceChildWith,
+  sliceText
+} from "./utils";
 
 export const getTagNode = (name: string) => {
   const tag = document.createElement("span");
@@ -14,16 +20,13 @@ export const getTagNode = (name: string) => {
 export const selectText = () => {
   const selection = window.getSelection();
   const { focusNode, focusOffset } = selection;
-
-  // добираемся до текста input>div>span>text
-  if (!isText(focusNode)) {
-    selection.setPosition(focusNode.firstChild, focusOffset);
-  }
-  if (!isText(focusNode)) {
-    selection.setPosition(focusNode.firstChild, focusOffset);
+  let text = getClosestChildText(focusNode);
+  const parentElement = text.parentElement;
+  if (parentElement.id) {
+    text = document.createTextNode(SPACE_CHAR);
+    parentElement.parentNode.insertBefore(text, parentElement);
   }
 
-  const text = focusNode;
   let node: Node = text.parentNode;
 
   // текст должен быть обернут в span, чтобы избежать неконтролируемое поведение contentEditable
@@ -40,31 +43,6 @@ export const selectText = () => {
   return { text, node, parent, focusOffset };
 };
 
-// делим текст и тэг на отдельные узлы в начале и конце должны быть спаны и в них должен быть хотя бы пробел
-// иначе браузер начнет создавать деревья разной глубины и будет глючить курсор
-export const sliceText = (text: string, offset: number) => {
-  const start = document.createElement("span");
-  const startText = text.slice(0, offset) || SPACE_CHAR;
-  start.appendChild(document.createTextNode(startText));
-
-  const end = document.createElement("span");
-  const endText = text.slice(offset) || SPACE_CHAR;
-  end.appendChild(document.createTextNode(endText));
-
-  return { start, end };
-};
-
-export const replaceChildWith = (parent: Node, child: Node, nodes: Node[]) => {
-  let prevNode = child;
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const currentNode = nodes[i];
-    parent.insertBefore(currentNode, prevNode);
-    prevNode = currentNode;
-  }
-
-  parent.removeChild(child);
-};
-
 interface Props {
   value: string;
   inputRef: React.MutableRefObject<HTMLDivElement>;
@@ -78,7 +56,6 @@ export const TagButton: React.FC<Props> = ({ value, inputRef, onToggle }) => {
 
     const { text, node, parent, focusOffset } = selectText();
     const { start, end } = sliceText(text.textContent, focusOffset);
-
     replaceChildWith(parent, node, [start, getTagNode(tagName), end]);
 
     const selection = window.getSelection();
@@ -107,9 +84,13 @@ export const TagButton: React.FC<Props> = ({ value, inputRef, onToggle }) => {
 
     if (!next && prev) {
       const selection = window.getSelection();
-      selection.setPosition(prev.firstChild, prev.textContent.length);
+      selection.setPosition(
+        prev.firstChild,
+        prev.firstChild.textContent.length
+      );
     }
     tagElement.remove();
+
     initRow(inputRef.current, true);
     inputRef.current.focus();
   };
