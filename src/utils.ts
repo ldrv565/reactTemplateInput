@@ -144,7 +144,6 @@ export const initRow = (rowNode: Node, needFocus?: boolean) => {
     const span = document.createElement("span");
     const spaceChar = document.createTextNode(SPACE_CHAR);
     span.appendChild(spaceChar);
-    console.log(rowNode);
     rowNode.appendChild(span);
     if (needFocus) {
       const selection = window.getSelection();
