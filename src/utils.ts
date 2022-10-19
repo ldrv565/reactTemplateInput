@@ -1,8 +1,8 @@
-import { SPACE_CHAR } from "./constants";
+import { SPACE_CHAR, TAGS_VALUES } from "./constants";
 
-export const isText = (node?: Node) => node?.nodeName === "#text";
-export const isSpan = (node?: Node) => node?.nodeName === "SPAN";
-export const isDiv = (node?: Node) => node?.nodeName === "DIV";
+export const isText = (node?: Node | null) => node?.nodeName === "#text";
+export const isSpan = (node?: Node | null) => node?.nodeName === "SPAN";
+export const isDiv = (node?: Node | null) => node?.nodeName === "DIV";
 
 export const isEmptyNode = (node: Node) => {
   if (node.firstChild && !node.firstChild?.textContent) {
@@ -11,12 +11,12 @@ export const isEmptyNode = (node: Node) => {
   return !node.firstChild;
 };
 
-export const getClosestParentDiv = (node?: Node) => {
+export const getClosestParentDiv = (node?: Node | null) => {
   let div = node;
-  if (isText(div)) {
+  if (isText(div) && div?.parentNode) {
     div = div.parentNode;
   }
-  if (isSpan(div)) {
+  if (isSpan(div) && div?.parentNode) {
     div = div.parentNode;
   }
   if (isDiv(div)) {
@@ -25,12 +25,12 @@ export const getClosestParentDiv = (node?: Node) => {
   return null;
 };
 
-export const getClosestChildText = (node?: Node) => {
+export const getClosestChildText = (node: Node | null) => {
   let text = node;
-  if (isDiv(text)) {
+  if (isDiv(text) && text?.firstChild) {
     text = text.firstChild;
   }
-  if (isSpan(text)) {
+  if (isSpan(text) && text?.firstChild) {
     text = text.firstChild;
   }
   if (isText(text)) {
@@ -44,35 +44,11 @@ export const clearFromTagNames = (text: string, tagNames: string[]) => {
   return text.replace(regExp, "");
 };
 
-// делим текст и тэг на отдельные узлы в начале и конце должны быть спаны и в них должен быть хотя бы пробел
-// иначе браузер начнет создавать деревья разной глубины и будет глючить курсор
-export const sliceText = (text: string, offset: number) => {
-  const start = document.createElement("span");
-  const startText = text.slice(0, offset) || SPACE_CHAR;
-  start.append(startText);
-
-  const end = document.createElement("span");
-  const endText = text.slice(offset) || SPACE_CHAR;
-  end.append(endText);
-
-  return { start, end };
-};
-
-export const replaceChildWith = (parent: Node, child: Node, nodes: Node[]) => {
-  let prevNode = child;
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const currentNode = nodes[i];
-    parent.insertBefore(currentNode, prevNode);
-    prevNode = currentNode;
-  }
-
-  parent.removeChild(child);
-};
-
 // удаляем тэги введеные руками, объединяем куски текста в единые спаны
 export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
   const selection = window.getSelection();
-  const { focusNode, focusOffset } = selection;
+
+  const { focusNode, focusOffset } = selection || {};
   let newFocusNode = focusNode;
   let newFocusOffset = focusOffset;
 
@@ -83,31 +59,41 @@ export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: function (node) {
-        if (node.parentElement.id) {
+        if (node.parentElement?.id) {
           return NodeFilter.FILTER_REJECT;
         }
 
         const currentSpan = isSpan(node.parentNode) ? node.parentNode : node;
 
+        if (!currentSpan) {
+          return NodeFilter.FILTER_SKIP;
+        }
+
         if (currentTextNode) {
-          if (focusNode.isSameNode(currentSpan) || focusNode.isSameNode(node)) {
+          if (
+            focusNode?.isSameNode(currentSpan) ||
+            focusNode?.isSameNode(node)
+          ) {
             newFocusNode = currentTextNode;
-            newFocusOffset = currentTextNode.textContent.length + focusOffset;
+            newFocusOffset =
+              (currentTextNode.textContent?.length ?? 0) + (focusOffset ?? 0);
           }
 
-          currentTextNode.textContent += currentSpan.textContent;
+          currentTextNode.textContent =
+            (currentTextNode.textContent ?? "") + currentSpan.textContent;
 
           const rowNode = getClosestParentDiv(node);
-          rowNode.removeChild(currentSpan);
+          rowNode?.removeChild(currentSpan);
         } else {
           currentTextNode = node;
         }
 
         const next = currentSpan.nextSibling;
-        const isNextTag = !!next?.firstChild?.parentElement.id;
+
+        const isNextTag = !!next?.firstChild?.parentElement?.id;
         const isLast = !next || isNextTag || isDiv(next);
 
-        if (isLast) {
+        if (isLast && currentTextNode.textContent) {
           const newTextContent = clearFromTagNames(
             currentTextNode.textContent,
             tagNames
@@ -116,7 +102,8 @@ export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
           if (newFocusNode?.isSameNode(currentTextNode)) {
             const currentLength = currentTextNode.textContent.length;
             const newLength = newTextContent.length;
-            newFocusOffset = newFocusOffset - (currentLength - newLength);
+            newFocusOffset =
+              (newFocusOffset ?? 0) - (currentLength - newLength);
           }
 
           currentTextNode.textContent = newTextContent;
@@ -125,7 +112,7 @@ export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
         }
 
         return NodeFilter.FILTER_SKIP;
-      }
+      },
     }
   );
 
@@ -135,7 +122,7 @@ export const normalizeTreeWalker = (parentNode: Node, tagNames: string[]) => {
   }
 
   if (newFocusNode) {
-    selection.setPosition(newFocusNode, newFocusOffset);
+    selection?.setPosition(newFocusNode, newFocusOffset);
   }
 };
 
@@ -147,21 +134,21 @@ export const initRow = (rowNode: Node, needFocus?: boolean) => {
     rowNode.appendChild(span);
     if (needFocus) {
       const selection = window.getSelection();
-      selection.setPosition(spaceChar, 0);
+      selection?.setPosition(spaceChar, 0);
     }
   }
 };
 
 export const initInputRows = (inputNode: Node) => {
   const selection = window.getSelection();
-  const { focusNode } = selection;
+  const { focusNode } = selection ?? {};
   const focusDiv = getClosestParentDiv(focusNode);
 
   if (inputNode.childNodes.length) {
     inputNode.childNodes.forEach((child) => {
-      let rowNode = getClosestParentDiv(child);
+      const rowNode = getClosestParentDiv(child);
 
-      if (isDiv(rowNode)) {
+      if (rowNode && isDiv(rowNode)) {
         const needFocus = focusDiv?.isSameNode(rowNode);
         initRow(rowNode, needFocus);
       }
@@ -170,3 +157,53 @@ export const initInputRows = (inputNode: Node) => {
     initRow(inputNode, true);
   }
 };
+
+export const getTagNode = (name: string) => {
+  const tag = document.createElement("span");
+  tag.className = "tag";
+  tag.setAttribute("id", name);
+  tag.appendChild(document.createTextNode(`{${name}}`));
+
+  return tag;
+};
+
+export const parseInitialValue = (initialValue: string) =>
+  initialValue.split("\n").map((rowText) => {
+    const div = document.createElement("div");
+
+    let endText = rowText;
+    const regExp = new RegExp(TAGS_VALUES.join("|"), "i");
+    let match = rowText.match(regExp);
+
+    if (match) {
+      while (match) {
+        const startText = endText.slice(0, match.index);
+
+        if (startText.length) {
+          const start = document.createElement("span");
+          start.append(startText);
+          div.appendChild(start);
+        }
+        const tagNode = getTagNode(match[0].replace(/\{|\}/g, ""));
+
+        div.appendChild(tagNode);
+
+        if (!tagNode.nextSibling) {
+          const end = document.createElement("span");
+          end.append(SPACE_CHAR);
+          div.appendChild(end);
+        }
+
+        const index = match.index ?? 0;
+
+        endText = endText.slice(index + match[0].length);
+        match = endText.match(regExp);
+      }
+      return div;
+    }
+
+    const span = document.createElement("span");
+    span.append(rowText);
+    div.appendChild(span);
+    return div;
+  });

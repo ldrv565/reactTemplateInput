@@ -1,12 +1,8 @@
 import React from "react";
-import {
-  InputBaseComponentProps,
-  styled,
-  TextField,
-  TextFieldProps
-} from "@material-ui/core";
+import { InputBaseComponentProps, styled } from "@material-ui/core";
+import { FormTextField, FormTextFieldProps } from "./FormTextField";
 
-const EditableBlockStyled = styled("div")({
+const EditableBlockStyled = styled("div")(({ theme }) => ({
   width: "100%",
   whiteSpace: "pre-wrap",
 
@@ -14,15 +10,14 @@ const EditableBlockStyled = styled("div")({
     userSelect: "none",
     userModify: "read-only",
     display: "inline-block",
-    color: "blue",
-    margin: 0
-  }
-});
+    color: theme.palette.primary.main,
+    margin: 0,
+  },
+}));
 
-const CustomInputComponent: React.FC<Omit<
-  InputBaseComponentProps,
-  "align"
->> = ({ inputRef, ...rest }) => (
+const CustomInputComponent: React.FC<
+  Omit<InputBaseComponentProps, "align">
+> = ({ inputRef, ...rest }) => (
   <EditableBlockStyled
     contentEditable
     role="textbox"
@@ -32,28 +27,22 @@ const CustomInputComponent: React.FC<Omit<
   />
 );
 
-const TextFieldStyled = styled(TextField)({
-  width: 173
-});
-
-export const TextfieldWithTags: React.FC<TextFieldProps> = (props) => {
-  return (
-    <TextFieldStyled
-      {...props}
-      onKeyDown={(e) => {
-        if (e.metaKey || e.ctrlKey) {
-          if (e.key === "z") {
-            e.preventDefault();
-          }
+export const TextfieldWithTags: React.FC<FormTextFieldProps> = (props) => (
+  <FormTextField
+    {...props}
+    multiline
+    onKeyDown={(e) => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "z") {
+          e.preventDefault();
         }
-      }}
-      multiline
-      InputProps={{
-        inputComponent: CustomInputComponent
-      }}
-      InputLabelProps={{
-        shrink: props.value ? true : undefined
-      }}
-    />
-  );
-};
+      }
+    }}
+    InputProps={{
+      inputComponent: CustomInputComponent,
+    }}
+    InputLabelProps={{
+      shrink: props.field.value ? true : undefined,
+    }}
+  />
+);
